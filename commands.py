@@ -101,7 +101,7 @@ def test(app, args):
     	'-Dwebdrive.classes=%s' % app.readConf('webdrive.classes'),
     	'-Dwebdrive.timeout=%s' % app.readConf('webdrive.timeout'),
     	'-Dapplication.url=%s://localhost:%s' % (protocol, http_port),
-    	'play.modules.webdrive.WebDriverRunner']
+    	'play.modules.webdrive.WebDriverRunner'] + app.java_cmd(args)
     try:
         subprocess.call(java_cmd, env=os.environ)
     except OSError:

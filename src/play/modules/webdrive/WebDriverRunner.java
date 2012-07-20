@@ -40,7 +40,14 @@ public class WebDriverRunner {
 	 */
 	private static final String DEFAULT_TEST_TIMEOUT = "120";
 
+	private static boolean ENABLE_SELENIUM_TESTS = true;
+
 	public static void main(String[] args) throws Exception {
+	    if(args!=null && args.length>2){
+	      if(args[2].contains("ENABLE_SELENIUM=false")){
+	        ENABLE_SELENIUM_TESTS=false;
+	      }
+	    }
     	if (new WebDriverRunner().run())
     		System.exit(0);
     	else
@@ -124,17 +131,22 @@ public class WebDriverRunner {
                     maxTestNameLength = testName.length();
                 }
                 if (test.contains(".test.html")) {
+                  if(ENABLE_SELENIUM_TESTS){
                 	seleniumTests.add(test);
+                  }
                 } else {
                 	nonSeleniumTests.add(test);
                 }
             }
             in.close();
-
-			System.out.println("~ " + seleniumTests.size() + " selenium test"
-					+ (seleniumTests.size() != 1 ? "s" : "") + " to run:");
-			System.out.println("~ " + nonSeleniumTests.size() + " other test"
-					+ (nonSeleniumTests.size() != 1 ? "s" : "") + " to run:");
+            if(ENABLE_SELENIUM_TESTS){
+              System.out.println("~ " + seleniumTests.size() + " selenium test"
+                  + (seleniumTests.size() != 1 ? "s" : "") + " to run:");
+            } else {
+              System.out.println("~ Selenium tests are deactivated.");
+            }
+            System.out.println("~ " + nonSeleniumTests.size() + " other test"
+                + (nonSeleniumTests.size() != 1 ? "s" : "") + " to run:");
             System.out.println("~");
         } catch(Exception e) {
             System.out.println("~ The application does not start. There are errors: " + e);
@@ -149,10 +161,12 @@ public class WebDriverRunner {
         /* Run non-selenium tests */
     	runTestsWithDriver(HtmlUnitDriver.class, nonSeleniumTests);
 
-    	/* Run selenium tests on all browsers */
-    	for (Class<?> driverClass : driverClasses) {
-        	runTestsWithDriver(driverClass, seleniumTests);
-        }
+    	if(ENABLE_SELENIUM_TESTS){
+    		/* Run selenium tests on all browsers */
+    		for (Class<?> driverClass : driverClasses) {
+        		runTestsWithDriver(driverClass, seleniumTests);
+        	}
+    	}
 
 		File resultFile = new File(testResultRoot, "result."
 				+ (failed ? "failed" : "passed"));
