@@ -16,14 +16,16 @@
 # limitations under the License.
 
 import subprocess
+import sys
 import urllib2
 
 from play.utils import *
 
-COMMANDS = [ 'webdrive:test' ]
+COMMANDS = [ 'webdrive:test', 'bambooify' ]
 
 HELP = {
-    'webdrive:test': 'Run tests using Selenium 2 WebDriver'
+    'webdrive:test': 'Run tests using Selenium 2 WebDriver',
+    'bambooify': 'Converts the html reuslt in JUnit-XML-Format'
 }
 
 def execute(**kargs):
@@ -33,6 +35,58 @@ def execute(**kargs):
 
     if command == 'webdrive:test':
         test(app, args)
+    elif command == 'bambooify':
+        generateJUnitXML(app, args)
+
+def generateJUnitXML(app, args):
+    app.check()
+    # If framework-id is not a valid test-id, force it to 'test'
+    if not isTestFrameworkId(app.play_env["id"]): 
+        app.play_env["id"] = 'test'
+    
+    print "~ Generate JUnit xml files from webdriver test module"
+    print "~ Ctrl+C to stop"
+    print "~ "
+    print "~ "
+    
+    # Kill if exists
+    http_port = 9000
+    protocol = 'http'
+    if app.readConf('https.port'):
+        http_port = app.readConf('https.port')
+        protocol = 'https'
+    else:
+        http_port = app.readConf('http.port')
+    try:
+        proxy_handler = urllib2.ProxyHandler({})
+        opener = urllib2.build_opener(proxy_handler)
+        opener.open('http://localhost:%s/@kill' % http_port)
+    except Exception, e:
+        pass
+    # Run app
+    test_result = os.path.join(app.path, 'test-result')
+    wdcp = app.getClasspath()
+    cp_args = ':'.join(wdcp)
+    if os.name == 'nt':
+        cp_args = ';'.join(wdcp) 
+    java_cmd = [app.java_path(), '-classpath', cp_args, 'play.modules.webdrive.SeleniumTests2JUnitXML']
+    java_cmd_str = " ".join(java_cmd)
+
+    try:
+        play_process = subprocess.Popen(java_cmd_str, env=os.environ, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        while True:
+            #next_line = play_process.communicate()[0]
+            next_line = play_process.stdout.readline()
+            if next_line == '' and play_process.poll() != None:
+                break
+            sys.stdout.write(next_line)
+            sys.stdout.flush()
+        print 'bambooify is ready'
+
+    except OSError:
+        print "Could not execute the java executable, please make sure the JAVA_HOME environment variable is set properly (the java executable should reside at JAVA_HOME/bin/java). "
+        sys.exit(-1)
+    
 
 def test(app, args):
     app.check()
@@ -96,12 +150,16 @@ def test(app, args):
     wdcp = app.getClasspath()
     cp_args = ':'.join(wdcp)
     if os.name == 'nt':
-        cp_args = ';'.join(wdcp)    
+        cp_args = ';'.join(wdcp)
+    seleniumStatus = ''.join(args)
+    if len(seleniumStatus) == 0:
+        seleniumStatus = '-D'
     java_cmd = [app.java_path(), '-classpath', cp_args,
-    	'-Dwebdrive.classes=%s' % app.readConf('webdrive.classes'),
-    	'-Dwebdrive.timeout=%s' % app.readConf('webdrive.timeout'),
-    	'-Dapplication.url=%s://localhost:%s' % (protocol, http_port),
-    	'play.modules.webdrive.WebDriverRunner'] + app.java_cmd(args)
+        seleniumStatus,
+        '-Dwebdrive.classes=%s' % app.readConf('webdrive.classes'),
+        '-Dwebdrive.timeout=%s' % app.readConf('webdrive.timeout'),
+        '-Dapplication.url=%s://localhost:%s' % (protocol, http_port),
+        'play.modules.webdrive.WebDriverRunner']
     try:
         subprocess.call(java_cmd, env=os.environ)
     except OSError:
