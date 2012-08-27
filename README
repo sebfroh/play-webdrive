@@ -16,3 +16,10 @@ Support
 =======
 This is a beta release. Please report any issues at
 https://github.com/rkaippully/play-webdrive.
+
+Parameters
+==========
+play webdrive:test -Dselenium.enabled=false
+  - deactivates the selenium tests
+play bambooify
+  - generates for selenium test results the JUnit xml files for the bamboo build server
