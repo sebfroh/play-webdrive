@@ -31,6 +31,8 @@ import org.openqa.selenium.htmlunit.HtmlUnitDriver;
 import org.openqa.selenium.ie.InternetExplorerDriver;
 import org.openqa.selenium.iphone.IPhoneDriver;
 
+import play.Logger;
+
 /**
  * Manages {@link WebDriver} instances to use for testing.
  */
@@ -66,13 +68,13 @@ public class DriverManager {
       }
 
       if (clazz == null || !WebDriver.class.isAssignableFrom(clazz)) {
-        System.out.println("~ " + driver + " is not a valid WebDriver implementation.");
+        Logger.info("~ " + driver + " is not a valid WebDriver implementation.");
         continue;
       }
 
       /* Skip IE if we are not on windows */
       if (InternetExplorerDriver.class.equals(clazz) && !System.getProperty("os.name").startsWith("Windows")) {
-        System.out.println("~ Cannot test with IE on " + System.getProperty("os.name"));
+        Logger.info("~ Cannot test with IE on " + System.getProperty("os.name"));
         continue;
       }
 

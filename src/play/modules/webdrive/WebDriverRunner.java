@@ -29,6 +29,8 @@ import org.joda.time.Duration;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.htmlunit.HtmlUnitDriver;
 
+import play.Logger;
+
 public class WebDriverRunner {
 
   /**
@@ -94,17 +96,17 @@ public class WebDriverRunner {
   private int maxTestNameLength;
 
   public WebDriverRunner() {
-    _enableSeleniumTest = Boolean.parseBoolean(System.getProperty(ENABLE_SELENIUM_KEY, DEFAULT_ENABLE_SELENIUM_TESTS));
+    String seleniumStateParameter = System.getProperty(ENABLE_SELENIUM_KEY, DEFAULT_ENABLE_SELENIUM_TESTS);
+    _enableSeleniumTest = Boolean.parseBoolean(seleniumStateParameter);
     this.appUrlBase = System.getProperty("application.url", DEFAULT_APP_URL);
     String timeoutStr = System.getProperty("webdrive.timeout", DEFAULT_TEST_TIMEOUT);
     try {
       if (timeoutStr == null || timeoutStr.trim().equals(""))
         timeoutStr = DEFAULT_TEST_TIMEOUT;
       this.testTimeoutInSeconds = Integer.parseInt(timeoutStr);
-      System.out.println("~ Using a timeout value of " + this.testTimeoutInSeconds + " seconds");
+      Logger.info("~ Using a timeout value of " + this.testTimeoutInSeconds + " seconds");
     } catch (NumberFormatException e) {
-      System.out
-          .println("~ The timeout value " + timeoutStr + " is not a " + "number. Setting to default value " + DEFAULT_TEST_TIMEOUT + " seconds");
+      Logger.info("~ The timeout value " + timeoutStr + " is not a " + "number. Setting to default value " + DEFAULT_TEST_TIMEOUT + " seconds");
       this.testTimeoutInSeconds = Integer.parseInt(DEFAULT_TEST_TIMEOUT);
     }
     retrieveTestsList();
@@ -139,14 +141,14 @@ public class WebDriverRunner {
       }
       in.close();
       if (_enableSeleniumTest) {
-        System.out.println("~ " + seleniumTests.size() + " selenium test" + (seleniumTests.size() != 1 ? "s" : "") + " to run:");
+        Logger.info("~ " + seleniumTests.size() + " selenium test" + (seleniumTests.size() != 1 ? "s" : "") + " to run:");
       } else {
-        System.out.println("~ Selenium tests are deactivated.");
+        Logger.info("~ Selenium tests are deactivated.");
       }
-      System.out.println("~ " + nonSeleniumTests.size() + " other test" + (nonSeleniumTests.size() != 1 ? "s" : "") + " to run:");
-      System.out.println("~");
+      Logger.info("~ " + nonSeleniumTests.size() + " other test" + (nonSeleniumTests.size() != 1 ? "s" : "") + " to run:");
+      Logger.info("~");
     } catch (Exception e) {
-      System.out.println("~ The application does not start. There are errors: " + e);
+      Logger.info("~ The application does not start. There are errors: " + e);
       System.exit(-1);
     }
   }
@@ -173,7 +175,7 @@ public class WebDriverRunner {
   }
 
   private void runTestsWithDriver(Class<?> webDriverClass, List<String> tests) throws Exception {
-    System.out.println("~ Starting tests with " + webDriverClass);
+    Logger.info("~ Starting tests with " + webDriverClass);
     long startTime = System.currentTimeMillis();
     WebDriver webDriver = (WebDriver) webDriverClass.newInstance();
     webDriver.get(appUrlBase + "/@tests/init");
@@ -181,11 +183,11 @@ public class WebDriverRunner {
     for (String test : tests) {
       long start = System.currentTimeMillis();
       String testName = test.replace(".class", "").replace(".test.html", "").replace(".", "/").replace("$", "/");
-      System.out.print("~ " + testName + "... ");
+      Logger.info("~ " + testName + "... ");
       for (int i = 0; i < maxTestNameLength - testName.length(); i++) {
-        System.out.print(" ");
+        Logger.info(" ");
       }
-      System.out.print("    ");
+      Logger.info("    ");
       String url;
       if (test.endsWith(".class")) {
         url = appUrlBase + "/@tests/" + test;
@@ -196,16 +198,16 @@ public class WebDriverRunner {
       int retry = 0;
       while (retry < testTimeoutInSeconds) {
         if (new File(testResultRoot, test.replace("/", ".") + ".passed.html").exists()) {
-          System.out.print("PASSED      ");
+          Logger.info("PASSED      ");
           break;
         } else if (new File(testResultRoot, test.replace("/", ".") + ".failed.html").exists()) {
-          System.out.print("FAILED   !  ");
+          Logger.info("FAILED   !  ");
           ok = false;
           break;
         } else {
           retry++;
           if (retry == testTimeoutInSeconds) {
-            System.out.print("TIMEOUT  ?  ");
+            Logger.info("TIMEOUT  ?  ");
             ok = false;
             break;
           }
@@ -219,9 +221,9 @@ public class WebDriverRunner {
       int minutes = (duration / (1000 * 60)) % 60;
 
       if (minutes > 0) {
-        System.out.println(minutes + " min " + seconds + "s");
+        Logger.info(minutes + " min " + seconds + "s");
       } else {
-        System.out.println(seconds + "s");
+        Logger.info(seconds + "s");
       }
     }
     webDriver.get(appUrlBase + "/@tests/end?result=" + (ok ? "passed" : "failed"));
@@ -234,7 +236,7 @@ public class WebDriverRunner {
     long endTime = System.currentTimeMillis();
     Duration testDuration = new Duration(startTime, endTime);
     String time = testDuration.getStandardSeconds() + " sec.";
-    System.out.println(" ~ duration: " + webDriver.getClass().getSimpleName() + " " + time);
+    Logger.info(" ~ duration: " + webDriver.getClass().getSimpleName() + " " + time);
   }
 
   /**
@@ -257,7 +259,7 @@ public class WebDriverRunner {
     if (file.isFile()) {
       File newFile = new File(destDir, file.getName());
       if (!file.renameTo(newFile)) {
-        System.out.println("~ Could not create " + newFile);
+        Logger.info("~ Could not create " + newFile);
       }
     }
   }
