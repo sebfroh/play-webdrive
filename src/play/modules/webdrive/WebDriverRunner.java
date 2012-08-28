@@ -20,6 +20,7 @@ package play.modules.webdrive;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
@@ -30,6 +31,9 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.htmlunit.HtmlUnitDriver;
 
 import play.Logger;
+
+import com.beust.jcommander.internal.Lists;
+import com.sun.jna.platform.FileUtils;
 
 public class WebDriverRunner {
 
@@ -45,7 +49,11 @@ public class WebDriverRunner {
 
   private static final String ENABLE_SELENIUM_KEY = "selenium.enabled";
 
-  private static String DEFAULT_ENABLE_SELENIUM_TESTS = "TRUE";
+  private static final String DEFAULT_ENABLE_SELENIUM_TESTS = "TRUE";
+
+  private static final String DEFAULT_ENABLE_JUNIT_TESTS_ONLY = "FALSE";
+
+  private static final String ENABLE_JUNIT_TESTS_ONLY = "junit.enabled.only";
 
   public static void main(String[] args) throws Exception {
     if (new WebDriverRunner().run())
@@ -58,6 +66,11 @@ public class WebDriverRunner {
    * Set to false if selenium tests must not run.
    */
   private boolean _enableSeleniumTest;
+
+  /**
+   * Set to true if only junit tests should run
+   */
+  private boolean _enableJUnitTestsOnly;
 
   /**
    * The "test-result" directory.
@@ -93,11 +106,15 @@ public class WebDriverRunner {
    * All non-selenium tests
    */
   private List<String> nonSeleniumTests = new ArrayList<String>();
+
+  private List<String> _junitTests = Lists.newArrayList();
   private int maxTestNameLength;
 
   public WebDriverRunner() {
     String seleniumStateParameter = System.getProperty(ENABLE_SELENIUM_KEY, DEFAULT_ENABLE_SELENIUM_TESTS);
     _enableSeleniumTest = Boolean.parseBoolean(seleniumStateParameter);
+    String enableJUnitOnly = System.getProperty(ENABLE_JUNIT_TESTS_ONLY, DEFAULT_ENABLE_JUNIT_TESTS_ONLY);
+    _enableJUnitTestsOnly = Boolean.parseBoolean(enableJUnitOnly);
     this.appUrlBase = System.getProperty("application.url", DEFAULT_APP_URL);
     String timeoutStr = System.getProperty("webdrive.timeout", DEFAULT_TEST_TIMEOUT);
     try {
@@ -110,6 +127,9 @@ public class WebDriverRunner {
       this.testTimeoutInSeconds = Integer.parseInt(DEFAULT_TEST_TIMEOUT);
     }
     retrieveTestsList();
+    if (_enableJUnitTestsOnly) {
+      _junitTests = calculateJUnitTests();
+    }
   }
 
   /**
@@ -139,6 +159,7 @@ public class WebDriverRunner {
           nonSeleniumTests.add(test);
         }
       }
+
       in.close();
       if (_enableSeleniumTest) {
         Logger.info("~ " + seleniumTests.size() + " selenium test" + (seleniumTests.size() != 1 ? "s" : "") + " to run:");
@@ -153,18 +174,41 @@ public class WebDriverRunner {
     }
   }
 
+  private List<String> calculateJUnitTests() {
+    List<String> allUnitTestNames = Lists.newArrayList();
+    String unittestClassname = "play.test.UnitTest";
+    for (String classFilename : nonSeleniumTests) {
+      try {
+        String javaFilenameToParse = classFilename.replace(".", File.separator);
+        javaFilenameToParse = javaFilenameToParse.replace(File.separatorChar + "class", ".java");
+        File classFile = new File("test", javaFilenameToParse);
+        String content = FileUtils.readFileToString(classFile);
+        if (content.contains(unittestClassname)) {
+          allUnitTestNames.add(classFilename);
+        }
+      } catch (IOException e) {
+        Logger.error(e, e.getMessage());
+      }
+    }
+    return allUnitTestNames;
+  }
+
   private boolean run() throws Exception {
     DriverManager manager = new DriverManager();
     List<Class<?>> driverClasses = manager.getDriverClasses();
 
     /* Run non-selenium tests */
+    if (_enableJUnitTestsOnly) {
+      Logger.info("  start to run unit tests: ");
+      runTestsWithDriver(HtmlUnitDriver.class, _junitTests);
+    } else {
+      runTestsWithDriver(HtmlUnitDriver.class, nonSeleniumTests);
 
-    runTestsWithDriver(HtmlUnitDriver.class, nonSeleniumTests);
-
-    if (_enableSeleniumTest) {
-      /* Run selenium tests on all browsers */
-      for (Class<?> driverClass : driverClasses) {
-        runTestsWithDriver(driverClass, seleniumTests);
+      if (_enableSeleniumTest) {
+        /* Run selenium tests on all browsers */
+        for (Class<?> driverClass : driverClasses) {
+          runTestsWithDriver(driverClass, seleniumTests);
+        }
       }
     }
 
@@ -183,11 +227,12 @@ public class WebDriverRunner {
     for (String test : tests) {
       long start = System.currentTimeMillis();
       String testName = test.replace(".class", "").replace(".test.html", "").replace(".", "/").replace("$", "/");
-      Logger.info("~ " + testName + "... ");
+      StringBuilder loggerOutput = new StringBuilder("~ " + testName + "... ");
+
       for (int i = 0; i < maxTestNameLength - testName.length(); i++) {
-        Logger.info(" ");
+        loggerOutput.append(" ");
       }
-      Logger.info("    ");
+      loggerOutput.append("    ");
       String url;
       if (test.endsWith(".class")) {
         url = appUrlBase + "/@tests/" + test;
@@ -198,16 +243,16 @@ public class WebDriverRunner {
       int retry = 0;
       while (retry < testTimeoutInSeconds) {
         if (new File(testResultRoot, test.replace("/", ".") + ".passed.html").exists()) {
-          Logger.info("PASSED      ");
+          loggerOutput.append("PASSED      ");
           break;
         } else if (new File(testResultRoot, test.replace("/", ".") + ".failed.html").exists()) {
-          Logger.info("FAILED   !  ");
+          loggerOutput.append("FAILED   !  ");
           ok = false;
           break;
         } else {
           retry++;
           if (retry == testTimeoutInSeconds) {
-            Logger.info("TIMEOUT  ?  ");
+            loggerOutput.append("TIMEOUT  ?  ");
             ok = false;
             break;
           }
@@ -221,10 +266,11 @@ public class WebDriverRunner {
       int minutes = (duration / (1000 * 60)) % 60;
 
       if (minutes > 0) {
-        Logger.info(minutes + " min " + seconds + "s");
+        loggerOutput.append(minutes + " min " + seconds + "s");
       } else {
-        Logger.info(seconds + "s");
+        loggerOutput.append(seconds + "s");
       }
+      Logger.info(loggerOutput.toString());
     }
     webDriver.get(appUrlBase + "/@tests/end?result=" + (ok ? "passed" : "failed"));
     webDriver.quit();
