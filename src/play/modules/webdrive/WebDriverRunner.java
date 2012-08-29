@@ -26,6 +26,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.io.FileUtils;
 import org.joda.time.Duration;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.htmlunit.HtmlUnitDriver;
@@ -33,7 +34,6 @@ import org.openqa.selenium.htmlunit.HtmlUnitDriver;
 import play.Logger;
 
 import com.beust.jcommander.internal.Lists;
-import com.sun.jna.platform.FileUtils;
 
 public class WebDriverRunner {
 
